@@ -2,14 +2,19 @@ require "option_parser"
 
 OptionParser.parse! do |parser|
 	parser.banner = "sd - Smart Directory"
+
+	if ARGV.empty?
+		sd
+	end
+
 	parser.on(long_flag: "--lock DIR", short_flag: "-l DIR", description: "Enables directory lock.") do |dir|
-		puts "Directory lock enabled in #{dir}."
+		lock dir
 	end
 
 	parser.missing_option do |flag|
 		case flag
 		when "-l", "--lock"
-			puts "Directory lock enabled in local dir."
+			lock(ENV["PWD"])
 		else
 			STDERR.puts "#{flag} requires a parameter."
 			STDERR.puts parser
@@ -22,4 +27,16 @@ OptionParser.parse! do |parser|
 		STDERR.puts parser
 		exit(1)
 	end
+end
+
+def sd
+end
+
+def lock(directory : String)
+	puts directory
+	puts config_exists?
+end
+
+def config_exists?
+	File.exists?("~/.config/sd/lockfile")
 end
