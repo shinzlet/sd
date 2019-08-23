@@ -5,15 +5,19 @@ This readme will be updated as soon as I've got this program somewhat usable, bu
 When I work in linux, my workflow is usually a little something like this:
 
 (in a terminal)
+```fish
 mkdir ~/src/new_project
 cd ~/src/new_project
 nvim source_code.cr
+```
 
 (then, in a new terminal next to that)
+```fish
 cd ~/src/new_project
 nvim readme.md
+```
 
-and then I do that a couple more times, opening terminals to write makefiles,
+And then I do that a couple more times, opening terminals to write makefiles,
 using other terminals to actually build and execute the code, yadda yadda. There's
 one thing here that's a *huge* pain, which is the cd step. When I get working on a
 project, the odds that I open a terminal with the intentions to navigate to a
