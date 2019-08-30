@@ -12,4 +12,4 @@ status:
 install: build
 	cp sd_bin /usr/bin/sd_bin
 
-.PHONY: clean build status
+.PHONY: clean build status install autoconfig

@@ -22,9 +22,17 @@ class SmartDirectory
 				navigate_to_default
 			end
 
-			# If only one argument has been provided, it is likely the user
+			# If only one argument has been provided, it is likely the user is
+			# trying to use sd in cd mode - eg "sd ~/Documents". Here, we check
+			# if this is the case, and act accordingly.
 			if ARGV.size == 1
-				puts ARGV[0]
+				unless ARGV[0][0] == '-'
+					if Dir.exists? ARGV[0]
+						execute "cd #{ARGV[0]}"
+					else
+						puts "#{ARGV[0]} is not a valid directory"
+					end
+				end
 			end
 
 
@@ -72,12 +80,12 @@ class SmartDirectory
 	# The function that is called when sd is invoked without parameters.
 	def navigate_to_default
 		if @data.lock.locked
-			STDERR.puts "cd #{@data.lock.location}"
+			execute "cd #{@data.lock.location}"
 		else
 			if @data.default
-				STDERR.puts "cd #{@data.default}"
+				execute "cd #{@data.default}"
 			else
-				STDERR.puts "cd #{ENV["HOME"] || "~"}"
+				execute "cd #{ENV["HOME"] || "~"}"
 			end
 		end
 
@@ -124,7 +132,7 @@ class SmartDirectory
 
 	def cd_if_locked
 		if @data.lock.locked
-			STDERR.puts "cd #{@data.lock.location}"
+			execute "cd #{@data.lock.location}"
 			exit 0
 		end
 	end
@@ -139,6 +147,23 @@ class SmartDirectory
 		puts "Lock directory: #{@data.lock.location}"
 
 		exit 0
+	end
+
+	# Normal methods of executing a shell command all happen within a subshell.
+	# Thus, the only way to actually execute a command inside the invoking shell is
+	# to run
+	# eval $(program)
+	# in their shell. As a result of this limitation, sd is rather contrived. This program
+	# (the binary), when executed, prints the command it wishes to run in the invoking shell
+	# through STDERR, and normal output through STDOUT. Then, a function which is defined or
+	# sourced from the user's bashrc, config.fish, or equivalent, is created which does the
+	# following: 
+	# 1) run sd_bin
+	# 2) print the stdout to the screen
+	# 3) eval STDERR
+	# This is all done inside sd.* files.
+	def execute(cmd : String)
+		STDERR.puts cmd
 	end
 end
 
