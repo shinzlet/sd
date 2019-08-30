@@ -21,7 +21,6 @@ class UtilFile
 	def self.load(dir_name, file_name)
 		filepath = "#{dir_name}/#{file_name}"
 		if File.exists? filepath
-			puts typeof(self)
 			instance = from_yaml File.read(filepath)
 			instance.dir_name = dir_name
 			instance.file_name = file_name
@@ -36,8 +35,8 @@ class UtilFile
 	# Similarly, the file will be created if it doesn't exist.
 	def save
 		# Create the directory if it doesn't already exist
-		unless Dir.exists? @dir_name
-			Dir.mkdir_p @dir_name
+		unless Dir.exists? @dir_name.as String
+			Dir.mkdir_p @dir_name.as String
 		end
 
 		File.write filepath, self.to_yaml

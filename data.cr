@@ -7,6 +7,9 @@ require "./util_file.cr"
 class Data < UtilFile
 	@@filename = "data.yml"
 
+	@[YAML::Field(key: "default")]
+	property default : String | Nil = nil
+
 	@[YAML::Field(key: "lock")]
 	property lock : Lock = Lock.new
 end
