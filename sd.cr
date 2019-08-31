@@ -2,6 +2,14 @@ require "option_parser"
 require "yaml"
 require "./data.cr"
 
+# This macro can be uesd to wrap debug code to only compile it if
+# the DEBUG=enabled environment variable exists.
+macro debug_only(code)
+	{%if env("DEBUG") == "enabled"%}
+		{{code}}
+	{%end%}
+end
+
 # outputs commands on STDERR,
 # outputs text on STDOUT
 class SmartDirectory
@@ -31,8 +39,13 @@ class SmartDirectory
 				end
 			end
 
-
 			parser.banner = "sd - Smart Directory"
+			
+			debug_only(
+				parser.on(long_flag: "--dump-yaml", short_flag: "-y", description: "") do
+					puts @data.to_yaml
+				end
+			)
 		
 			parser.on(long_flag: "--default DIR", short_flag: "-d DIR", description: "Specifies the default directory. Note that this is always enabled, whereas the lock directory is toggleable and project specific.") do |dir|
 				set_default dir
@@ -50,7 +63,7 @@ class SmartDirectory
 			end
 
 			parser.on(flag: "--lock-status", description: "Prints the status of the lock, specifically if the lock is enabled, and the directory it points to.") do
-				print_lock_status
+				@data.lock.print_status
 				exit 0
 			end
 
@@ -82,6 +95,43 @@ class SmartDirectory
 				exit 0
 			end
 
+			parser.on(long_flag: "--use-history BOOL", short_flag: "-h BOOL", description: "Enables or disables the use of history logging.") do |bool|
+				if bool == "true"
+					@data.history.enabled = true
+				elsif bool == "false"
+					@data.history.enabled = false
+					@data.history.delete_all
+					@data.save
+				else
+					puts "Expected true or false, read '#{bool}'. Failed to set history state."
+					exit 1
+				end
+
+				@data.save
+				exit 0
+			end
+
+			parser.on(long_flag: "--history-status", short_flag: "-H", description: "Prints the logged directory history.") do
+				@data.history.print_status
+				exit 0
+			end
+
+			parser.on(long_flag: "--foward", short_flag: "-f", description: "Steps forwards in history, if it is enabled.") do
+				history_step 1
+			end
+
+			parser.on(long_flag: "--back", short_flag: "-b", description: "Steps backwards in history, if it is enabled.") do
+				history_step -1
+			end
+
+			parser.on(long_flag: "--jump AMOUNT", short_flag: "-j AMOUNT", description: "Jumps in history by AMOUNT steps. Positive for forward, negative for backward.") do |amount|
+				begin
+					history_step amount.to_i32
+				rescue ex
+					puts "failed to step in history - '#{amount}' is not an integer."
+				end
+			end
+
 			parser.on(short_flag: "-h", long_flag: "--help", description: "Prints this help menu.") do
 				puts parser
 				exit 0
@@ -90,7 +140,7 @@ class SmartDirectory
 			parser.missing_option do |flag|
 				case flag
 				when "-l", "--lock"
-					enable_lock directory: ENV["PWD"]
+					enable_lock Dir.current
 					exit 0
 				else
 					puts "#{flag} requires a parameter."
@@ -110,28 +160,29 @@ class SmartDirectory
 	# The function that is called when sd is invoked without parameters.
 	def navigate
 		if @data.lock.locked
-			execute "cd #{@data.lock.location}"
+			cd_to @data.lock.location
 		else
 			if @data.default
-				execute "cd #{@data.default}"
+				cd_to @data.default
 			else
-				execute "cd #{ENV["HOME"] || "~"}"
+				cd_to Dir.current
 			end
 		end
 	end
 
 	# The function that is called when sd is invoked with a single string that is not a flag.
-	# That is, `name` is either a directory, shortcut name, or malformed command.
-	def navigate_to(name : String)
+	# That is, `location` is either a directory, shortcut name, or malformed command.
+	def navigate_to(location : String)
 		# Check if the directory exists - directories have priority over shortcut names.
-		if Dir.exists? ARGV[0]
-			execute "cd #{ARGV[0]}"
+		directory = Path[location].expand.to_s
+		if Dir.exists? directory
+			cd_to directory
 		else
 			begin
-				result = @data.shortcuts[name]
-				execute "cd #{result}"
+				result = @data.shortcuts[location]
+				cd_to result
 			rescue ex
-				puts "#{ARGV[0]} is not a valid directory or shortcut."
+				puts "#{location} is not a valid directory or shortcut."
 				exit 1
 			end
 		end
@@ -142,7 +193,7 @@ class SmartDirectory
 	def navigate_to_shortcut(name : String)
 		begin
 			result = @data.shortcuts[name]
-			execute "cd #{result}"
+			cd_to result
 		rescue ex
 			puts "#{name} is not a valid shortcut."
 			exit 1
@@ -150,18 +201,24 @@ class SmartDirectory
 	end
 
 	# This function is invoked when the lock flag is recieved.
-	def enable_lock(directory : String)
-		unless Dir.exists? directory
-			puts "Refusing to lock on non-existent directory '#{directory}'."
-			exit 1
+	def enable_lock(location : String)
+		directory = Path[location].expand.to_s
+		if Dir.exists? directory
+			@data.lock.location = directory
+			puts "locked to '#{directory}'"
+		else
+			begin
+				result = @data.shortcuts[location]
+				@data.lock.location = result
+				puts "locked to '#{location}' (#{result})"
+			rescue ex
+				puts "no directory or shortcut named '#{directory}' exists"
+				exit 1
+			end
 		end
 
 		@data.lock.locked = true
-		@data.lock.location = directory
-
 		@data.save
-		
-		puts "locked to '#{directory}'."
 	end
 
 	def disable_lock()
@@ -189,18 +246,8 @@ class SmartDirectory
 
 	def cd_if_locked
 		if @data.lock.locked
-			execute "cd #{@data.lock.location}"
+			cd_to @data.lock.location
 		end
-	end
-
-	def print_lock_status
-		if @data.lock.locked
-			puts "Lock enabled"
-		else
-			puts "Lock disabled"
-		end
-
-		puts "Lock directory: #{@data.lock.location}"
 	end
 
 	def create_shortcut(name : String, dir : String)
@@ -218,9 +265,19 @@ class SmartDirectory
 	end
 
 	def print_shortcuts()
-		puts "Shortcuts:"
+		puts "shortcuts:"
 		@data.shortcuts.each do |key, value|
 			puts "#{key} -> #{value}"
+		end
+	end
+
+	def history_step(amount)
+		if @data.history.enabled
+			@data.history.step amount
+			@data.save
+			cd_to path: @data.history.get_current, track: false
+		else
+			puts "history is not enabled"
 		end
 	end
 
@@ -239,6 +296,15 @@ class SmartDirectory
 	# This is all done inside sd.* files.
 	def execute(cmd : String)
 		STDERR.puts cmd
+	end
+
+	def cd_to(path : String, track : Bool = true)
+		if @data.history.enabled && track
+			@data.history.push path
+			@data.save
+		end
+
+		execute "cd #{path}"
 	end
 end
 
