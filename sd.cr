@@ -19,7 +19,7 @@ class SmartDirectory
 			# will navigate to `~`, but sd allows you to configure that
 			# directory.
 			if ARGV.empty?
-				navigate_to_default
+				navigate
 			end
 
 			# If only one argument has been provided, it is likely the user is
@@ -27,11 +27,7 @@ class SmartDirectory
 			# if this is the case, and act accordingly.
 			if ARGV.size == 1
 				unless ARGV[0][0] == '-'
-					if Dir.exists? ARGV[0]
-						execute "cd #{ARGV[0]}"
-					else
-						puts "#{ARGV[0]} is not a valid directory"
-					end
+					navigate_to ARGV[0]
 				end
 			end
 
@@ -59,6 +55,7 @@ class SmartDirectory
 			end
 
 			parser.on(long_flag: "--create-shortcut NAME DIR", short_flag: "-s NAME DIR", description: "Creates a shortcut with the given name and directory. If the directory is not specified, the current directory is used.") do |name|
+				puts "hmm"
 				if ARGV.size > 0
 					if Dir.exists? (path = ARGV.delete_at(0))
 						create_shortcut name, path
@@ -69,6 +66,10 @@ class SmartDirectory
 					create_shortcut name, ENV["PWD"]
 				end
 				exit 0
+			end
+
+			parser.on(long_flag: "--shortcut NAME", short_flag: "-n NAME", description: "Forces sd to recognize NAME as a shortcut, not a local directory.") do |name|
+
 			end
 
 			parser.on(short_flag: "-h", long_flag: "--help", description: "Prints this help menu.") do
@@ -96,7 +97,7 @@ class SmartDirectory
 	end
 
 	# The function that is called when sd is invoked without parameters.
-	def navigate_to_default
+	def navigate
 		if @data.lock.locked
 			execute "cd #{@data.lock.location}"
 		else
@@ -104,6 +105,23 @@ class SmartDirectory
 				execute "cd #{@data.default}"
 			else
 				execute "cd #{ENV["HOME"] || "~"}"
+			end
+		end
+	end
+
+	# The function that is called when sd is invoked with a single string that is not a flag.
+	# That is, `name` is either a directory, shortcut name, or malformed command.
+	def navigate_to(name : String)
+		# Check if the directory exists - directories have priority over shortcut names.
+		if Dir.exists? ARGV[0]
+			execute "cd #{ARGV[0]}"
+		else
+			begin
+				result = @data.shortcuts[name]
+				execute "cd #{result}"
+			rescue ex
+				puts "#{ARGV[0]} is not a valid directory or shortcut."
+				exit 1
 			end
 		end
 	end
