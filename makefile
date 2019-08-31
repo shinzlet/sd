@@ -7,7 +7,7 @@ clean:
 	rm -rf ~/.config/sd
 
 status:
-	ls ~/.config/sd
+	cat ~/.config/sd/data.yml
 
 install: build
 	cp sd_bin /usr/bin/sd_bin

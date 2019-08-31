@@ -40,18 +40,35 @@ class SmartDirectory
 		
 			parser.on(long_flag: "--default DIR", short_flag: "-d DIR", description: "Specifies the default directory. Note that this is always enabled, whereas the lock directory is toggleable and project specific.") do |dir|
 				set_default dir
+				exit 0
 			end
 			
 			parser.on(long_flag: "--lock DIR", short_flag: "-l DIR", description: "Enables directory lock.") do |dir|
 				enable_lock dir
+				exit 0
 			end
 			
 			parser.on(long_flag: "--unlock", short_flag: "-u", description: "Disables directory lock.") do
 				disable_lock
+				exit 0
 			end
 
 			parser.on(flag: "--lock-status", description: "Prints the status of the lock, specifically if the lock is enabled, and the directory it points to.") do
 				print_lock_status
+				exit 0
+			end
+
+			parser.on(long_flag: "--create-shortcut NAME DIR", short_flag: "-s NAME DIR", description: "Creates a shortcut with the given name and directory. If the directory is not specified, the current directory is used.") do |name|
+				if ARGV.size > 0
+					if Dir.exists? (path = ARGV.delete_at(0))
+						create_shortcut name, path
+					else
+						puts "Refusing to create shortcut for non-existent path '#{path}'."
+					end
+				else
+					create_shortcut name, ENV["PWD"]
+				end
+				exit 0
 			end
 
 			parser.on(short_flag: "-h", long_flag: "--help", description: "Prints this help menu.") do
@@ -62,6 +79,7 @@ class SmartDirectory
 				case flag
 				when "-l", "--lock"
 					enable_lock directory: ENV["PWD"]
+					exit 0
 				else
 					puts "#{flag} requires a parameter."
 					puts parser
@@ -88,8 +106,6 @@ class SmartDirectory
 				execute "cd #{ENV["HOME"] || "~"}"
 			end
 		end
-
-		exit 0
 	end
 
 	# This function is invoked when the lock flag is recieved.
@@ -133,7 +149,6 @@ class SmartDirectory
 	def cd_if_locked
 		if @data.lock.locked
 			execute "cd #{@data.lock.location}"
-			exit 0
 		end
 	end
 
@@ -145,8 +160,11 @@ class SmartDirectory
 		end
 
 		puts "Lock directory: #{@data.lock.location}"
+	end
 
-		exit 0
+	def create_shortcut(name : String, dir : String)
+		@data.shortcuts[name] = dir
+		@data.save
 	end
 
 	# Normal methods of executing a shell command all happen within a subshell.

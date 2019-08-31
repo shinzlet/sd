@@ -12,6 +12,9 @@ class Data < UtilFile
 
 	@[YAML::Field(key: "lock")]
 	property lock : Lock = Lock.new
+
+	@[YAML::Field(key: "shortcuts")]
+	property shortcuts : Hash(String, String) = Hash(String, String).new
 end
 
 class Lock
