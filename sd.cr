@@ -67,12 +67,24 @@ class SmartDirectory
 				exit 0
 			end
 
-			parser.on(long_flag: "--shortcut NAME", short_flag: "-n NAME", description: "Forces sd to recognize NAME as a shortcut, not a local directory.") do |name|
+			parser.on(long_flag: "--delete-shortcut NAME", short_flag: "-x NAME", description: "Deletes the shortcut with a given name, if it exists.") do |name|
+				delete_shortcut name
+				exit 0
+			end
 
+			parser.on(long_flag: "--shortcut NAME", short_flag: "-n NAME", description: "Forces sd to recognize NAME as a shortcut, not a local directory.") do |name|
+				navigate_to_shortcut name
+				exit 0
+			end
+
+			parser.on(long_flag: "--shortcuts", short_flag: "-p", description: "Prints a list of all exisiting shortcuts.") do
+				print_shortcuts
+				exit 0
 			end
 
 			parser.on(short_flag: "-h", long_flag: "--help", description: "Prints this help menu.") do
 				puts parser
+				exit 0
 			end
 
 			parser.missing_option do |flag|
@@ -122,6 +134,18 @@ class SmartDirectory
 				puts "#{ARGV[0]} is not a valid directory or shortcut."
 				exit 1
 			end
+		end
+	end
+
+	# This function specifically navigates to a shortcut, and does not check if name
+	# is a directory. Used by --shortcut to override local dirs.
+	def navigate_to_shortcut(name : String)
+		begin
+			result = @data.shortcuts[name]
+			execute "cd #{result}"
+		rescue ex
+			puts "#{name} is not a valid shortcut."
+			exit 1
 		end
 	end
 
@@ -182,6 +206,22 @@ class SmartDirectory
 	def create_shortcut(name : String, dir : String)
 		@data.shortcuts[name] = dir
 		@data.save
+	end
+
+	def delete_shortcut(name : String)
+		if @data.shortcuts.delete(name)
+			@data.save
+			puts "deleted the shortcut '#{name}'."
+		else
+			puts "the shortcut '#{name}' does not exist."
+		end
+	end
+
+	def print_shortcuts()
+		puts "Shortcuts:"
+		@data.shortcuts.each do |key, value|
+			puts "#{key} -> #{value}"
+		end
 	end
 
 	# Normal methods of executing a shell command all happen within a subshell.
