@@ -55,7 +55,6 @@ class SmartDirectory
 			end
 
 			parser.on(long_flag: "--create-shortcut NAME DIR", short_flag: "-s NAME DIR", description: "Creates a shortcut with the given name and directory. If the directory is not specified, the current directory is used.") do |name|
-				puts "hmm"
 				if ARGV.size > 0
 					if Dir.exists? (path = ARGV.delete_at(0))
 						create_shortcut name, path
