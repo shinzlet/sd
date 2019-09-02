@@ -1,10 +1,14 @@
+SD_PATH = "src/sd.cr"
+BIN_PATH = "bin/sd_bin"
+INSTALL_PATH = "/usr/bin/sd_bin"
+
 all: build
 
 build:
-	crystal build sd.cr -o sd_bin --threads=1
+	crystal build $(SD_PATH) -o$(BIN_PATH) --threads=1
 
 debug:
-	DEBUG=enabled crystal build sd.cr -o sd_bin --threads=1
+	DEBUG=enabled crystal build $(SD_PATH) -o$(BIN_PATH) --threads=1
 
 clean:
 	rm -rf ~/.config/sd
@@ -12,10 +16,7 @@ clean:
 status:
 	cat ~/.config/sd/data.yml
 
-install: build
-	cp sd_bin /usr/bin/sd_bin
-
-debug_install: debug
-	cp sd_bin /usr/bin/sd_bin
+install:
+	cp $(BIN_PATH) /usr/bin/sd_bin
 
 .PHONY: clean build status install debug

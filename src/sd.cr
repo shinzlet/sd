@@ -19,7 +19,7 @@ class SmartDirectory
 	@data : Data
 
 	def initialize
-		@data = Data.load @@config_dir, "data.yml"
+		@data = Data.load @@config_dir, Data.filename
 
 		OptionParser.parse! do |parser|
 			# If no arguments have been provided, sd will just navigate to

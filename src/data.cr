@@ -7,6 +7,10 @@ require "./util_file.cr"
 class Data < UtilFile
 	@@filename = "sd.yml"
 
+	def self.filename
+		@@filename
+	end
+
 	@[YAML::Field(key: "default")]
 	property default : String = Path.home.expand.to_s
 
