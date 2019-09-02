@@ -5,10 +5,10 @@ INSTALL_PATH = "/usr/bin/sd_bin"
 all: build
 
 build:
-	crystal build $(SD_PATH) -o$(BIN_PATH) --threads=1
+	crystal build $(SD_PATH) -o $(BIN_PATH) --threads=1
 
 debug:
-	DEBUG=enabled crystal build $(SD_PATH) -o$(BIN_PATH) --threads=1
+	DEBUG=enabled crystal build $(SD_PATH) -o $(BIN_PATH) --threads=1
 
 clean:
 	rm -rf ~/.config/sd
