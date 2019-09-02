@@ -75,6 +75,7 @@ class History
 	end
 
 	def push(path)
+		return if get_current == path
 		log.push path
 		@index = (log.size - 1).to_u32
 
