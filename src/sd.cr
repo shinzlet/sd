@@ -23,26 +23,18 @@ class SmartDirectory
 		@data = Data.load @@config_dir, Data.filename
 
 		Phreak.parse! do |root|
-			root.bind(word: "lock", short_flag: 'l') do |sub|
-				sub.bind(word: "enable", short_flag: 'e') do |sub|
-				end
-
-				sub.bind(word: "disable", short_flag: 'd') do |sub|
-					
-				end
-
-				sub.bind(word: "status", short_flag: 's') do |sub|
-					@data.lock.print_status
-				end
-
-				sub.unrecognized_arguments do |arg|
-					// TODO
-				end
+			root.bind(word: "default", short_flag: 'd') do |sub|
+				puts "default"
 			end
 
+			root.bind(word: "lock", short_flag: 'l') do |sub|
+				sub.fuzzy_bind(word: "disable") do |sub|
+					puts "disabled"
+				end
 
-			root.bind(word: "default", short_flag: 'd') do |sub|
-				
+				sub.fuzzy_bind(word: "enable") do |sub|
+					puts "enabled"
+				end
 			end
 
 			root.insufficient_arguments do |apex|
