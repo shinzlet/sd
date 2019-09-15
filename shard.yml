@@ -4,6 +4,10 @@ version: 0.1.0
 authors:
   - Seth Hinz <sethhinz@me.com>
 
+dependencies:
+  phreak:
+    github: shinzlet/phreak
+
 description: |
   TODO
 
