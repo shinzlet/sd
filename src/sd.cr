@@ -24,17 +24,89 @@ class SmartDirectory
 
 		Phreak.parse! do |root|
 			root.bind(word: "default", short_flag: 'd') do |sub|
-				puts "default"
+				sub.fuzzy_bind(word: "set") do |sub|
+					sub.grab do |sub, path|
+						set_default path
+					end
+
+					sub.insufficient_arguments do |apex|
+						set_default Dir.current
+					end
+				end
+
+				sub.insufficient_arguments do |apex|
+					navigate_to @data.default
+				end
 			end
 
 			root.bind(word: "lock", short_flag: 'l') do |sub|
 				sub.fuzzy_bind(word: "disable") do |sub|
-					puts "disabled"
+					disable_lock
+					exit 0
 				end
 
 				sub.fuzzy_bind(word: "enable") do |sub|
-					puts "enabled"
+					path = root.token_available? ? root.next_token : Dir.current
+					enable_lock path
+					exit 0
 				end
+
+				sub.fuzzy_bind(word: "status") do |sub|
+					@data.lock.print_status
+					exit 0
+				end
+
+				# By default, `sd lock` = `sd lock enable`
+				sub.grab do |sub, path|
+					enable_lock path
+					exit 0
+				end
+
+				# If no path or subcommand was provided, enable lock in current dir.
+				sub.insufficient_arguments do |apex|
+					enable_lock Dir.current
+					exit 0
+				end
+			end
+
+			root.bind(word: "unlock", short_flag: 'u') do |sub|
+				disable_lock
+				exit 0
+			end
+
+			root.bind(word: "back", short_flag: 'b') do |sub|
+				history_step -1
+			end
+
+			root.bind(word: "next", short_flag: 'n') do |sub|
+				history_step 1
+			end
+
+			root.bind(word: "jump", short_flag: 'n') do |sub|
+				sub.fuzzy_bind(word: "back") do |sub|
+					history_step -1
+				end
+
+				sub.fuzzy_bind(word: "next") do |sub|
+					history_step 1
+				end
+
+				sub.grab do |sub, value|
+					begin
+						amount = value.to_i32
+						history_step amount
+					rescue ex
+						puts "Cannot jump by '#{value}'!"
+					end
+				end
+			end
+
+			root.grab do |sub, path|
+				navigate_to path
+			end
+
+			root.default do
+				navigate
 			end
 
 			root.insufficient_arguments do |apex|
@@ -44,42 +116,9 @@ class SmartDirectory
 			root.unrecognized_arguments do |name|
 				puts "'#{name}' is not a recognized token."
 			end
-
-			root.default do
-				navigate
-			end
 		end
 
 		# OptionParser.parse! do |parser|
-		# 	# If only one argument has been provided, it is likely the user is
-		# 	# trying to use sd in cd mode - eg "sd ~/Documents". Here, we check
-		# 	# if this is the case, and act accordingly.
-		# 	if ARGV.size == 1
-		# 		unless ARGV[0][0] == '-'
-		# 			navigate_to ARGV[0]
-		# 		end
-		# 	end
-
-		# 	parser.on(long_flag: "--default DIR", short_flag: "-d DIR", description: "Specifies the default directory. Note that this is always enabled, whereas the lock directory is toggleable and project specific.") do |dir|
-		# 		set_default dir
-		# 		exit 0
-		# 	end
-			
-		# 	parser.on(long_flag: "--lock DIR", short_flag: "-l DIR", description: "Enables directory lock.") do |dir|
-		# 		enable_lock dir
-		# 		exit 0
-		# 	end
-			
-		# 	parser.on(long_flag: "--unlock", short_flag: "-u", description: "Disables directory lock.") do
-		# 		disable_lock
-		# 		exit 0
-		# 	end
-
-		# 	parser.on(flag: "--lock-status", description: "Prints the status of the lock, specifically if the lock is enabled, and the directory it points to.") do
-		# 		@data.lock.print_status
-		# 		exit 0
-		# 	end
-
 		# 	parser.on(long_flag: "--create-shortcut NAME DIR", short_flag: "-s NAME DIR", description: "Creates a shortcut with the given name and directory. If the directory is not specified, the current directory is used.") do |name|
 		# 		if ARGV.size > 0
 		# 			if Dir.exists? (path = ARGV.delete_at(0))
@@ -144,30 +183,6 @@ class SmartDirectory
 		# 			puts "failed to step in history - '#{amount}' is not an integer."
 		# 		end
 		# 	end
-
-		# 	parser.on(short_flag: "-h", long_flag: "--help", description: "Prints this help menu.") do
-		# 		puts parser
-		# 		exit 0
-		# 	end
-
-		# 	parser.missing_option do |flag|
-		# 		case flag
-		# 		when "-l", "--lock"
-		# 			enable_lock Dir.current
-		# 			exit 0
-		# 		else
-		# 			puts "#{flag} requires a parameter."
-		# 			puts parser
-		# 			exit 1
-		# 		end
-		# 	end
-		
-		# 	parser.invalid_option do |flag|
-		# 		puts "#{flag} is not a valid option."
-		# 		puts parser
-		# 		exit 1
-		# 	end
-		# end
 	end
 
 	# The function that is called when sd is invoked without parameters.
