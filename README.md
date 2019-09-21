@@ -1,5 +1,7 @@
 # sd - Smart Directory
 
+[Trello](https://trello.com/b/iwIrhDYp/sd)
+
 This readme will be updated as soon as I've got this program somewhat usable, but for now I'll throw down a quick explanation of what it is.
 
 When I work in linux, my workflow is usually a little something like this:
