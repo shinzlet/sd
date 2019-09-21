@@ -23,7 +23,9 @@ class SmartDirectory
 		@data = Data.load @@config_dir, Data.filename
 
 		Phreak.parse! do |root|
+			# Bind subcommands
 			root.bind(word: "default", short_flag: 'd') do |sub|
+				# Sets the default directory, falling back to the current directory if no path provided
 				sub.fuzzy_bind(word: "set") do |sub|
 					sub.grab do |sub, path|
 						set_default path
@@ -34,29 +36,33 @@ class SmartDirectory
 					end
 				end
 
+				# When `default` is called standalone, navigate to the default directory.
 				sub.insufficient_arguments do |apex|
 					navigate_to @data.default
 				end
 			end
 
 			root.bind(word: "lock", short_flag: 'l') do |sub|
+				# Disables locking.
 				sub.fuzzy_bind(word: "disable") do |sub|
 					disable_lock
 					exit 0
 				end
 
+				# Enables locking, either to the current directory or to a provided key.
 				sub.fuzzy_bind(word: "enable") do |sub|
 					path = root.token_available? ? root.next_token : Dir.current
 					enable_lock path
 					exit 0
 				end
 
+				# Prints the status of the lock
 				sub.fuzzy_bind(word: "status") do |sub|
 					@data.lock.print_status
 					exit 0
 				end
 
-				# By default, `sd lock` = `sd lock enable`
+				# If `lock` is called standalone, it will by default act the same as `sd lock enable`.
 				sub.grab do |sub, path|
 					enable_lock path
 					exit 0
@@ -69,28 +75,18 @@ class SmartDirectory
 				end
 			end
 
-			root.bind(word: "unlock", short_flag: 'u') do |sub|
-				disable_lock
-				exit 0
-			end
-
-			root.bind(word: "back", short_flag: 'b') do |sub|
-				history_step -1
-			end
-
-			root.bind(word: "next", short_flag: 'n') do |sub|
-				history_step 1
-			end
-
 			root.bind(word: "jump", short_flag: 'n') do |sub|
+				# Jump back one step
 				sub.fuzzy_bind(word: "back") do |sub|
 					history_step -1
 				end
 
+				# Jump forwards one step
 				sub.fuzzy_bind(word: "next") do |sub|
 					history_step 1
 				end
 
+				# Jump forwards by a specified increment
 				sub.grab do |sub, value|
 					begin
 						amount = value.to_i32
@@ -101,10 +97,54 @@ class SmartDirectory
 				end
 			end
 
+			root.bind(word: "shortcut", short_flag: 's') do |sub|
+				sub.fuzzy_bind(word: "create") do |sub|
+					# Attempt to get the name
+					sub.grab do |sub, name|
+						# If the name was available, attempt to get the path to bind it to
+						sub.grab do |sub, path|
+							create_shortcut name, path
+						end
+
+						# If no path was provided, but a name was, bind the current directory to it.
+						sub.insufficient_arguments do
+							create_shortcut name, Dir.current
+						end
+					end
+				end
+
+				sub.fuzzy_bind(word: "delete") do |sub|
+					sub.grab do |sub, name|
+						delete_shortcut name
+					end
+				end
+			end
+
+			# Bind shortcut commands for frequent actions
+			# Quick unlock
+			root.bind(word: "unlock", short_flag: 'u') do |sub|
+				disable_lock
+				exit 0
+			end
+
+			# Takes one step back in history.
+			root.bind(word: "back", short_flag: 'b') do |sub|
+				history_step -1
+			end
+
+			# Takes one step forwards in the history.
+			root.bind(word: "next", short_flag: 'n') do |sub|
+				history_step 1
+			end
+
+
+			# If `sd` is called with a single parameter that didn't match any command, it's likely
+			# being given a literal directory. Navigate to it.
 			root.grab do |sub, path|
 				navigate_to path
 			end
 
+			# If `sd` is called with no arguments, simply perform the default navigate action. (lock or default depending on state)
 			root.default do
 				navigate
 			end
@@ -117,72 +157,6 @@ class SmartDirectory
 				puts "'#{name}' is not a recognized token."
 			end
 		end
-
-		# OptionParser.parse! do |parser|
-		# 	parser.on(long_flag: "--create-shortcut NAME DIR", short_flag: "-s NAME DIR", description: "Creates a shortcut with the given name and directory. If the directory is not specified, the current directory is used.") do |name|
-		# 		if ARGV.size > 0
-		# 			if Dir.exists? (path = ARGV.delete_at(0))
-		# 				create_shortcut name, path
-		# 			else
-		# 				puts "Refusing to create shortcut for non-existent path '#{path}'."
-		# 			end
-		# 		else
-		# 			create_shortcut name, ENV["PWD"]
-		# 		end
-		# 		exit 0
-		# 	end
-
-		# 	parser.on(long_flag: "--delete-shortcut NAME", short_flag: "-x NAME", description: "Deletes the shortcut with a given name, if it exists.") do |name|
-		# 		delete_shortcut name
-		# 		exit 0
-		# 	end
-
-		# 	parser.on(long_flag: "--shortcut NAME", short_flag: "-n NAME", description: "Forces sd to recognize NAME as a shortcut, not a local directory.") do |name|
-		# 		navigate_to_shortcut name
-		# 		exit 0
-		# 	end
-
-		# 	parser.on(long_flag: "--shortcuts", short_flag: "-p", description: "Prints a list of all exisiting shortcuts.") do
-		# 		print_shortcuts
-		# 		exit 0
-		# 	end
-
-		# 	parser.on(long_flag: "--use-history BOOL", short_flag: "-h BOOL", description: "Enables or disables the use of history logging.") do |bool|
-		# 		if bool == "true"
-		# 			@data.history.enabled = true
-		# 		elsif bool == "false"
-		# 			@data.history.enabled = false
-		# 			@data.history.delete_all
-		# 			@data.save
-		# 		else
-		# 			puts "Expected true or false, read '#{bool}'. Failed to set history state."
-		# 			exit 1
-		# 		end
-
-		# 		@data.save
-		# 		exit 0
-		# 	end
-
-		# 	parser.on(long_flag: "--history-status", short_flag: "-H", description: "Prints the logged directory history.") do
-		# 		@data.history.print_status
-		# 		exit 0
-		# 	end
-
-		# 	parser.on(long_flag: "--foward", short_flag: "-f", description: "Steps forwards in history, if it is enabled.") do
-		# 		history_step 1
-		# 	end
-
-		# 	parser.on(long_flag: "--back", short_flag: "-b", description: "Steps backwards in history, if it is enabled.") do
-		# 		history_step -1
-		# 	end
-
-		# 	parser.on(long_flag: "--jump AMOUNT", short_flag: "-j AMOUNT", description: "Jumps in history by AMOUNT steps. Positive for forward, negative for backward.") do |amount|
-		# 		begin
-		# 			history_step amount.to_i32
-		# 		rescue ex
-		# 			puts "failed to step in history - '#{amount}' is not an integer."
-		# 		end
-		# 	end
 	end
 
 	# The function that is called when sd is invoked without parameters.
