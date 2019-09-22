@@ -1,5 +1,6 @@
 require "option_parser"
 require "yaml"
+require "phreak"
 require "./data.cr"
 
 # This macro can be uesd to wrap debug code to only compile it if
@@ -21,138 +22,164 @@ class SmartDirectory
 	def initialize
 		@data = Data.load @@config_dir, Data.filename
 
-		OptionParser.parse! do |parser|
-			# If no arguments have been provided, sd will just navigate to
-			# the defualt directory. This is much like how running `$ cd`
-			# will navigate to `~`, but sd allows you to configure that
-			# directory.
-			if ARGV.empty?
-				navigate
-			end
+		Phreak.parse! do |root|
+			# Bind subcommands
+			root.bind(word: "default", short_flag: 'd') do |sub|
+				# Sets the default directory, falling back to the current directory if no path provided
+				sub.fuzzy_bind(word: "set") do |sub|
+					sub.grab do |sub, path|
+						set_default path
+					end
 
-			# If only one argument has been provided, it is likely the user is
-			# trying to use sd in cd mode - eg "sd ~/Documents". Here, we check
-			# if this is the case, and act accordingly.
-			if ARGV.size == 1
-				unless ARGV[0][0] == '-'
-					navigate_to ARGV[0]
+					sub.insufficient_arguments do |apex|
+						set_default Dir.current
+					end
+				end
+
+				# When `default` is called standalone, navigate to the default directory.
+				sub.insufficient_arguments do |apex|
+					navigate_to @data.default
 				end
 			end
 
-			parser.banner = "sd - Smart Directory"
-			
-			debug_only(
-				parser.on(long_flag: "--dump-yaml", short_flag: "-y", description: "") do
-					puts @data.to_yaml
+			root.bind(word: "lock", short_flag: 'l') do |sub|
+				# Disables locking.
+				sub.fuzzy_bind(word: "disable") do |sub|
+					disable_lock
+					exit 0
 				end
-			)
-		
-			parser.on(long_flag: "--default DIR", short_flag: "-d DIR", description: "Specifies the default directory. Note that this is always enabled, whereas the lock directory is toggleable and project specific.") do |dir|
-				set_default dir
-				exit 0
+
+				# Enables locking, either to the current directory or to a provided key.
+				sub.fuzzy_bind(word: "enable") do |sub| path = root.token_available? ? root.next_token : Dir.current
+					enable_lock path
+					exit 0
+				end
+
+				# Prints the status of the lock
+				sub.fuzzy_bind(word: "status") do |sub|
+					@data.lock.print_status
+					exit 0
+				end
+
+				# If `lock` is called standalone, it will by default act the same as `sd lock enable`.
+				sub.grab do |sub, path|
+					enable_lock path
+					exit 0
+				end
+
+				# If no path or subcommand was provided, enable lock in current dir.
+				sub.insufficient_arguments do |apex|
+					enable_lock Dir.current
+					exit 0
+				end
 			end
-			
-			parser.on(long_flag: "--lock DIR", short_flag: "-l DIR", description: "Enables directory lock.") do |dir|
-				enable_lock dir
-				exit 0
+
+			root.bind(word: "history", short_flag: 'h') do |sub|
+				sub.fuzzy_bind(word: "enable") do |sub|
+					@data.history.enabled = true
+					@data.save
+				end
+
+				sub.fuzzy_bind(word: "disable") do |sub|
+					@data.history.enabled = false
+					@data.history.delete_all
+					@data.save
+				end
+
+				sub.fuzzy_bind(word: "status") do |sub|
+					@data.history.print_status
+				end
+
+				sub.fuzzy_bind(word: "jump") do |sub|
+					# Jump back one step
+					sub.fuzzy_bind(word: "back") do |sub|
+						history_step -1 end
+
+					# Jump forwards one step
+					sub.fuzzy_bind(word: "next") do |sub|
+						history_step 1
+					end
+
+					# Jump forwards by a specified increment
+					sub.grab do |sub, value|
+						begin
+							amount = value.to_i32
+							history_step amount
+						rescue ex
+							puts "Cannot jump by '#{value}'!"
+						end
+					end
+				end
 			end
-			
-			parser.on(long_flag: "--unlock", short_flag: "-u", description: "Disables directory lock.") do
+
+
+			root.bind(word: "shortcut", short_flag: 's') do |sub|
+				sub.fuzzy_bind(word: "create") do |sub|
+					# Attempt to get the name
+					sub.grab do |sub, name|
+						# If the name was available, attempt to get the path to bind it to
+						sub.grab do |sub, path|
+							create_shortcut name, path
+						end
+
+						# If no path was provided, but a name was, bind the current directory to it.
+						sub.insufficient_arguments do
+							create_shortcut name, Dir.current
+						end
+					end
+				end
+
+				sub.fuzzy_bind(word: "delete") do |sub|
+					sub.grab do |sub, name|
+						delete_shortcut name
+					end
+				end
+
+				sub.fuzzy_bind(word: "status") do |sub|
+					print_shortcuts
+				end
+				
+				# If a shortcut name is specified, navigate to it unambiguously (ignore local folders)
+				sub.grab do |sub, name|
+					navigate_to_shortcut name
+				end
+			end
+
+			# Bind shortcut commands for frequent actions
+			# Quick unlock
+			root.bind(word: "unlock", short_flag: 'u') do |sub|
 				disable_lock
 				exit 0
 			end
 
-			parser.on(flag: "--lock-status", description: "Prints the status of the lock, specifically if the lock is enabled, and the directory it points to.") do
-				@data.lock.print_status
-				exit 0
-			end
-
-			parser.on(long_flag: "--create-shortcut NAME DIR", short_flag: "-s NAME DIR", description: "Creates a shortcut with the given name and directory. If the directory is not specified, the current directory is used.") do |name|
-				if ARGV.size > 0
-					if Dir.exists? (path = ARGV.delete_at(0))
-						create_shortcut name, path
-					else
-						puts "Refusing to create shortcut for non-existent path '#{path}'."
-					end
-				else
-					create_shortcut name, ENV["PWD"]
-				end
-				exit 0
-			end
-
-			parser.on(long_flag: "--delete-shortcut NAME", short_flag: "-x NAME", description: "Deletes the shortcut with a given name, if it exists.") do |name|
-				delete_shortcut name
-				exit 0
-			end
-
-			parser.on(long_flag: "--shortcut NAME", short_flag: "-n NAME", description: "Forces sd to recognize NAME as a shortcut, not a local directory.") do |name|
-				navigate_to_shortcut name
-				exit 0
-			end
-
-			parser.on(long_flag: "--shortcuts", short_flag: "-p", description: "Prints a list of all exisiting shortcuts.") do
-				print_shortcuts
-				exit 0
-			end
-
-			parser.on(long_flag: "--use-history BOOL", short_flag: "-h BOOL", description: "Enables or disables the use of history logging.") do |bool|
-				if bool == "true"
-					@data.history.enabled = true
-				elsif bool == "false"
-					@data.history.enabled = false
-					@data.history.delete_all
-					@data.save
-				else
-					puts "Expected true or false, read '#{bool}'. Failed to set history state."
-					exit 1
-				end
-
-				@data.save
-				exit 0
-			end
-
-			parser.on(long_flag: "--history-status", short_flag: "-H", description: "Prints the logged directory history.") do
-				@data.history.print_status
-				exit 0
-			end
-
-			parser.on(long_flag: "--foward", short_flag: "-f", description: "Steps forwards in history, if it is enabled.") do
-				history_step 1
-			end
-
-			parser.on(long_flag: "--back", short_flag: "-b", description: "Steps backwards in history, if it is enabled.") do
+			# Takes one step back in history.
+			root.bind(word: "back", short_flag: 'b') do |sub|
 				history_step -1
 			end
 
-			parser.on(long_flag: "--jump AMOUNT", short_flag: "-j AMOUNT", description: "Jumps in history by AMOUNT steps. Positive for forward, negative for backward.") do |amount|
-				begin
-					history_step amount.to_i32
-				rescue ex
-					puts "failed to step in history - '#{amount}' is not an integer."
-				end
+			# Takes one step forwards in the history.
+			root.bind(word: "next", short_flag: 'n') do |sub|
+				history_step 1
 			end
 
-			parser.on(short_flag: "-h", long_flag: "--help", description: "Prints this help menu.") do
-				puts parser
-				exit 0
+
+			# If `sd` is called with a single parameter that didn't match any command, it's likely
+			# being given a literal directory. Navigate to it.
+			root.grab do |sub, path|
+				navigate_to path
 			end
 
-			parser.missing_option do |flag|
-				case flag
-				when "-l", "--lock"
-					enable_lock Dir.current
-					exit 0
-				else
-					puts "#{flag} requires a parameter."
-					puts parser
-					exit 1
-				end
+			# If `sd` is called with no arguments, simply perform the default navigate action. (lock or default depending on state)
+			root.default do
+				navigate
 			end
-		
-			parser.invalid_option do |flag|
-				puts "#{flag} is not a valid option."
-				puts parser
-				exit 1
+
+			root.insufficient_arguments do |apex|
+				puts "Insufficient arguments were collected after `#{apex}`"
+			end
+			
+			root.unrecognized_arguments do |name|
+				puts "'#{name}' is not a recognized token."
 			end
 		end
 	end
