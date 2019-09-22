@@ -50,8 +50,7 @@ class SmartDirectory
 				end
 
 				# Enables locking, either to the current directory or to a provided key.
-				sub.fuzzy_bind(word: "enable") do |sub|
-					path = root.token_available? ? root.next_token : Dir.current
+				sub.fuzzy_bind(word: "enable") do |sub| path = root.token_available? ? root.next_token : Dir.current
 					enable_lock path
 					exit 0
 				end
@@ -75,27 +74,44 @@ class SmartDirectory
 				end
 			end
 
-			root.bind(word: "jump", short_flag: 'n') do |sub|
-				# Jump back one step
-				sub.fuzzy_bind(word: "back") do |sub|
-					history_step -1
+			root.bind(word: "history", short_flag: 'h') do |sub|
+				sub.fuzzy_bind(word: "enable") do |sub|
+					@data.history.enabled = true
+					@data.save
 				end
 
-				# Jump forwards one step
-				sub.fuzzy_bind(word: "next") do |sub|
-					history_step 1
+				sub.fuzzy_bind(word: "disable") do |sub|
+					@data.history.enabled = false
+					@data.history.delete_all
+					@data.save
 				end
 
-				# Jump forwards by a specified increment
-				sub.grab do |sub, value|
-					begin
-						amount = value.to_i32
-						history_step amount
-					rescue ex
-						puts "Cannot jump by '#{value}'!"
+				sub.fuzzy_bind(word: "print") do |sub|
+					@data.history.print_status
+				end
+
+				sub.fuzzy_bind(word: "jump") do |sub|
+					# Jump back one step
+					sub.fuzzy_bind(word: "back") do |sub|
+						history_step -1 end
+
+					# Jump forwards one step
+					sub.fuzzy_bind(word: "next") do |sub|
+						history_step 1
+					end
+
+					# Jump forwards by a specified increment
+					sub.grab do |sub, value|
+						begin
+							amount = value.to_i32
+							history_step amount
+						rescue ex
+							puts "Cannot jump by '#{value}'!"
+						end
 					end
 				end
 			end
+
 
 			root.bind(word: "shortcut", short_flag: 's') do |sub|
 				sub.fuzzy_bind(word: "create") do |sub|
@@ -117,6 +133,15 @@ class SmartDirectory
 					sub.grab do |sub, name|
 						delete_shortcut name
 					end
+				end
+
+				sub.fuzzy_bind(word: "print") do |sub|
+					print_shortcuts
+				end
+				
+				# If a shortcut name is specified, navigate to it unambiguously (ignore local folders)
+				sub.grab do |sub, name|
+					navigate_to_shortcut name
 				end
 			end
 
