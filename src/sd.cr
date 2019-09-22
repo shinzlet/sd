@@ -86,7 +86,7 @@ class SmartDirectory
 					@data.save
 				end
 
-				sub.fuzzy_bind(word: "print") do |sub|
+				sub.fuzzy_bind(word: "status") do |sub|
 					@data.history.print_status
 				end
 
@@ -135,7 +135,7 @@ class SmartDirectory
 					end
 				end
 
-				sub.fuzzy_bind(word: "print") do |sub|
+				sub.fuzzy_bind(word: "status") do |sub|
 					print_shortcuts
 				end
 				

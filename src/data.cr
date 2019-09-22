@@ -69,8 +69,7 @@ class History
 		else
 			puts "history:"
 			log.each_index do |index|
-				puts "#{index}: #{log[index]} #{index == @index ? "< here" : ""}"
-			end
+				puts "#{index}: #{log[index]} #{index == @index ? "< here" : ""}" end
 		end
 	end
 
@@ -102,6 +101,7 @@ class History
 	end
 
 	def get_current
+		return "" if @index >= log.size
 		return log[@index]
 	end
 end
