@@ -31,13 +31,13 @@ class SmartDirectory
 						set_default path
 					end
 
-					sub.insufficient_arguments do |apex|
+					sub.missing_args do |apex|
 						set_default Dir.current
 					end
 				end
 
 				# When `default` is called standalone, navigate to the default directory.
-				sub.insufficient_arguments do |apex|
+				sub.missing_args do |apex|
 					navigate_to @data.default
 				end
 			end
@@ -68,7 +68,7 @@ class SmartDirectory
 				end
 
 				# If no path or subcommand was provided, enable lock in current dir.
-				sub.insufficient_arguments do |apex|
+				sub.missing_args do |apex|
 					enable_lock Dir.current
 					exit 0
 				end
@@ -123,7 +123,7 @@ class SmartDirectory
 						end
 
 						# If no path was provided, but a name was, bind the current directory to it.
-						sub.insufficient_arguments do
+						sub.missing_args do
 							create_shortcut name, Dir.current
 						end
 					end
@@ -174,11 +174,11 @@ class SmartDirectory
 				navigate
 			end
 
-			root.insufficient_arguments do |apex|
+			root.missing_args do |apex|
 				puts "Insufficient arguments were collected after `#{apex}`"
 			end
 			
-			root.unrecognized_arguments do |name|
+			root.unrecognized_args do |name|
 				puts "'#{name}' is not a recognized token."
 			end
 		end
