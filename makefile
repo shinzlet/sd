@@ -1,14 +1,15 @@
-SD_PATH = "src/sd.cr"
+SD_PATH = "src/main.cr"
 BIN_PATH = "bin/sd_bin"
 INSTALL_PATH = "/usr/bin/sd_bin"
+LANG = "en"
 
 all: build
 
 build:
-	crystal build $(SD_PATH) -o $(BIN_PATH) --threads=1
+	SD_LANG="$(LANG)" crystal build $(SD_PATH) -o $(BIN_PATH) --threads=1
 
 debug:
-	DEBUG=enabled crystal build $(SD_PATH) -o $(BIN_PATH) --threads=1
+	SD_LANG="$(LANG)" DEBUG=enabled crystal build $(SD_PATH) -o $(BIN_PATH) --threads=1
 
 clean:
 	rm -rf ~/.config/sd

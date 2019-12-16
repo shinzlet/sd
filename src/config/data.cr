@@ -5,11 +5,7 @@ require "./util_file.cr"
 # this is where directory aliases, project aliases, and lock settings
 # are stored.
 class Data < UtilFile
-	@@filename = "sd.yml"
-
-	def self.filename
-		@@filename
-	end
+	class_getter filename = "sd.yml"
 
 	@[YAML::Field(key: "default")]
 	property default : String = Path.home.expand.to_s
@@ -22,6 +18,10 @@ class Data < UtilFile
 	
 	@[YAML::Field(key: "history")]
 	property history : History = History.new
+
+	def self.load(dir : String)
+		super(dir, @@filename)
+	end
 end
 
 class Lock
