@@ -6,10 +6,10 @@ LANG = "en"
 all: build
 
 build:
-	SD_LANG="$(LANG)" crystal build $(SD_PATH) -o $(BIN_PATH) --threads=1
+	SD_LANG=$(LANG) crystal build $(SD_PATH) -o $(BIN_PATH) --threads=1
 
 debug:
-	SD_LANG="$(LANG)" DEBUG=enabled crystal build $(SD_PATH) -o $(BIN_PATH) --threads=1
+	SD_LANG=$(LANG) DEBUG=enabled crystal build $(SD_PATH) -o $(BIN_PATH) --threads=1 --error-trace
 
 clean:
 	rm -rf ~/.config/sd

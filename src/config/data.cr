@@ -35,14 +35,6 @@ class Lock
 
 	@[YAML::Field(key: "location")]
 	property location : String = "/"
-
-	def print_status
-		if locked
-			puts "locked to '#{location}'"
-		else
-			puts "lock disabled"
-		end
-	end
 end
 
 class History
@@ -62,16 +54,6 @@ class History
 
 	@[YAML::Field(key: "index")]
 	property index : UInt32 = 0
-
-	def print_status
-		if log.size == 0
-			puts "no history to log."
-		else
-			puts "history:"
-			log.each_index do |index|
-				puts "#{index}: #{log[index]} #{index == @index ? "< here" : ""}" end
-		end
-	end
 
 	def push(path)
 		return if get_current == path
