@@ -3,6 +3,7 @@ require "yaml"
 require "phreak"
 
 require "./config/data.cr"
+require "./exceptions.cr"
 
 # Implements all the backend functionality of SD. Note that this class
 # relies heavily on dependency injection - most methods require the SD
@@ -27,8 +28,16 @@ class SD
 	# filepath, return a filepath. If the location string is a
 	# valid shortcut *and* filesystem path, it is assumed that
 	# the path was meant, not the shortcut.
-	def self.resolve_path(data : Data, location : String)
+	def self.resolve_path(data : Data, location : String) : String
 		dbp "resolve_path: #{data}, #{location}"
+
+		if Dir.exists?(location)
+			return Path[location].expand.to_s
+		elsif data.shortcuts.has_key?(location)
+			return Path[data.shortcuts[location]].expand.to_s
+		else
+			raise InvalidLocationException.new
+		end
 	end
 	
 	# Set the default directory for SD to use. The default directory is

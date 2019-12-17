@@ -1,0 +1,13 @@
+---
+default: /home/directory
+lock:
+  locked: false
+  location: /
+shortcuts:
+  /var: /mnt
+  short: /home
+history:
+  enabled: false
+  max_size: 10
+  log: []
+  index: 0
