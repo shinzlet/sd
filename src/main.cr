@@ -27,9 +27,34 @@ Phreak.parse! do |root|
 	 on_history(data, sub)
   end
 
-  root.bind(word: JUMP_KEYWORD,
-	 description: JUMP_DESCRIPTION) do |sub|
+  root.bind(word: JUMP_KEYWORD, description: JUMP_DESCRIPTION) do |sub|
 	 on_jump(data, sub)
+  end
+
+  root.bind(word: SHORTCUT_KEYWORD, description: SHORTCUT_DESCRIPTION) do |sub|
+	 on_shortcut(data, sub)
+  end
+
+  root.bind(word: LOCK_KEYWORD, description: ALIAS_LOCK_DESCRIPTION) do |sub|
+	 sub.grab do |sub, location|
+		SD.lock_to(data, location)
+		exit
+	 end
+  end
+
+  root.bind(word: UNLOCK_KEYWORD, description: ALIAS_UNLOCK_DESCRIPTION) do
+	 SD.disable_lock(data)
+	 exit
+  end
+
+  root.bind(word: JUMP_NEXT_KEYWORD, description: ALIAS_NEXT_DESCRIPTION) do
+	 SD.jump(data, 1)
+	 exit
+  end
+
+  root.bind(word: JUMP_BACK_KEYWORD, description: ALIAS_BACK_DESCRIPTION) do
+	 SD.jump(data, -1)
+	 exit
   end
 
   root.bind(word: HELP_KEYWORD, description: HELP_DESC) do
@@ -37,8 +62,23 @@ Phreak.parse! do |root|
     exit
   end
 
+  root.grab do |sub, location|
+	 SD.navigate(data, location)
+	 exit
+  end
+
+  root.default do
+	 SD.navigate(data, SD.get_default(data), shortcut: false)
+	 exit
+  end
+
   root.missing_args do |apex|
 	 printf(MISSING_ARGS, apex)
+	 exit
+  end
+
+  root.unrecognized_args do |arg|
+	 printf(UNRECOGNIZED_ARGS, arg)
 	 exit
   end
 end
@@ -125,7 +165,7 @@ def on_lock(data, root)
   end
 
   root.grab do |sub, location|
-    SD.lock_to(data, Dir.current)
+    SD.lock_to(data, location)
     exit
   end
 
@@ -189,10 +229,10 @@ def on_jump(data, root)
 
 	 case value
 		# Matches strings like 'back'
-		when /^[bB]/
+		when JUMP_BACK_REGEX
 		  amount = -1
 		# Matches strings like 'next'
-		when /^[nN]/
+		when JUMP_NEXT_REGEX
 		  amount = 1
 		# Matches integers or garbage values
 		else
@@ -205,6 +245,51 @@ def on_jump(data, root)
 	 end
 
 	 SD.jump(data, amount)
+	 exit
+  end
+end
+
+def on_shortcut(data, root)
+  root.banner = SHORTCUT_BANNER
+
+  root.bind(word: CREATE_KEYWORD,
+	 description: SHORTCUT_CREATE_DESCRIPTION) do |sub|
+	 # Attempt to get the shortcut name
+	 sub.grab do |sub, name|
+		# If there is a provided path, we want to use that to create the
+		# shortcut
+		sub.grab do |sub, path|
+		  SD.create_shortcut(data, name, path)
+		  exit
+		end
+
+		# If no path was provided, use the current directory instead
+		sub.missing_args do
+		  SD.create_shortcut(data, name, Dir.current)
+		  exit
+		end
+	 end
+  end
+
+  root.bind(word: DELETE_KEYWORD,
+	 description: SHORTCUT_DELETE_DESCRIPTION) do |sub|
+	 sub.grab do |sub, name|
+		SD.delete_shortcut(data, name)
+		exit
+	 end
+  end
+
+  root.bind(word: STATUS_KEYWORD,
+	 description: SHORTCUT_STATUS_DESCRIPTION) do |sub|
+	 shortcuts = SD.get_shortcuts(data)
+	 shortcuts.each do |name, path|
+		puts "#{name} -> #{path}"
+	 end
+	 exit
+  end
+
+  root.grab do |sub, name|
+	 SD.navigate(data, name, shortcut: true)
 	 exit
   end
 end

@@ -96,4 +96,19 @@ class SD
 	def self.jump(data : Data, step_size : Int32)
 		dbp "jump: #{data}, #{step_size}"
 	end
+
+	# Create a shortcut in the SD datafile.
+	def self.create_shortcut(data : Data, name : String, path : String)
+		dbp "create_shortcut: #{data}, #{name}, #{path}"
+	end
+
+	# Delete a shortcut in the SD datafile.
+	def self.delete_shortcut(data : Data, name : String)
+		dbp "delete_shortcut: #{data}, #{name}"
+	end
+
+	def self.get_shortcuts(data : Data) : Hash(String, String)
+		dbp "get_shortcuts: #{data}"
+		{"one" => "two", "three" => "four"}
+	end
 end
