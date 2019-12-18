@@ -27,44 +27,64 @@ class SD
 	# Given an ambiguous location, which may be a shortcut or a
 	# filepath, return a filepath. If the location string is a
 	# valid shortcut *and* filesystem path, it is assumed that
-	# the path was meant, not the shortcut.
-	def self.resolve_path(data : Data, location : String) : String
-		dbp "resolve_path: #{data}, #{location}"
+	# the path was meant, not the shortcut. If the location is
+	# invalid, raise an InvalidLocationException.
+	def self.resolve(data : Data, location : String,
+								 shortcut : Bool? = nil) : String
+		dbp "resolve: #{data}, #{location}"
 
-		if Dir.exists?(location)
-			return Path[location].expand.to_s
-		elsif data.shortcuts.has_key?(location)
+		if shortcut
+			raise InvalidLocationException.new unless data.shortcuts.has_key? location
 			return Path[data.shortcuts[location]].expand.to_s
+		elsif shortcut == false # Must be explicit, nil is falsey
+			raise InvalidLocationException.new unless Dir.exists? location
+			return Path[location].expand.to_s
 		else
-			raise InvalidLocationException.new
+			# the request was ambiguous, so we have to try both
+			begin
+				return resolve(data, location, shortcut: false)
+			rescue ex : InvalidLocationException
+				# The potential exception here is left to the invoker to handle
+				return resolve(data, location, shortcut: true)
+			end
 		end
 	end
 	
 	# Set the default directory for SD to use. The default directory is
 	# where sd will nagivate to by default when the lock is disabled. Uses the
-	# same inferece rules as `SD#set_default`.
-	def self.set_default(data : Data, path : String, shortcut : Bool? = nil)
-		dbp "set_default: #{data}, #{path}, #{shortcut}"
+	# same inferece rules as `SD#set_default`. Throws an 
+	# InvalidLocationException if the location is invalid.
+	def self.set_default(data : Data, location : String, shortcut : Bool? = nil)
+		dbp "set_default: #{data}, #{location}, #{shortcut}"
+
+		data.default = resolve(data, location, shortcut)
+		data.save
 	end
 
 	# Return the default directory indicated in the SD data file.
 	def self.get_default(data : Data) : String
 		dbp "get_default: #{data}"
-		"xoxoxo"
+		data.default
 	end
 
 	# Navigates to the provided location. If `shortcut` is true or false, rather
 	# than `nil`, the location will be interpreted as a shortcut or filesystem
 	# path as specified. Otherwise, the location meaning will be inferred using
-	# `SD#resolve_path`.
+	# `SD#resolve_path`. Throws InvalidLocationException if the provided 
+	# location does not exist.
 	def self.navigate(data : Data, location : String, shortcut : Bool? = nil)
 		dbp "navigate: #{data}, #{location}, #{shortcut}"
+
+		STDERR.puts "cd #{resolve(data, location, shortcut)}"
 	end
 
 	# Enables the lock in the SD datafile, setting it to a provided location.
 	# This function uses the same shortcut/path inference as `SD#navigate`.
+	# If the path cannot be resolved, an InvalidLocationException will be
+	# thrown.
 	def self.lock_to(data : Data, location : String, shortcut : Bool? = nil)
 		dbp "lock_to: #{data}, #{location}, #{shortcut}"
+		data.lock.locked = true
 	end
 
 	# Disables the lock in the provided SD datafile.
